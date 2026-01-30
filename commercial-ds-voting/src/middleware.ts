@@ -4,23 +4,19 @@ import { createServerClient } from "@supabase/ssr";
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const getAllReqCookies = () => {
-    // NextRequest cookies API should support getAll, but guard anyway
-    // @ts-expect-error runtime feature detection
-    if (typeof request.cookies.getAll === "function") return request.cookies.getAll();
-    return [];
-  };
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => getAllReqCookies(),
+        getAll: () => {
+          // NextRequest.cookies supports getAll() in modern Next.
+          // If not available, fall back to empty.
+          const anyCookies = request.cookies as unknown as { getAll?: () => any[] };
+          return typeof anyCookies.getAll === "function" ? anyCookies.getAll() : [];
+        },
         setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -30,7 +26,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Refresh session if present
   await supabase.auth.getUser();
+
   return response;
 }
 
