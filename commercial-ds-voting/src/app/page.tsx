@@ -6,7 +6,7 @@ export default async function Home({
 }: {
   searchParams?: { sent?: string; denied?: string; err?: string };
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (data.user) redirect("/lab");
 
